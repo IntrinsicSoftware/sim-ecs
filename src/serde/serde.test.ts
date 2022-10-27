@@ -51,7 +51,6 @@ describe("Test SerDe", () => {
         serdeOptions ?? options
       )
       .toJSON();
-    console.log(serial);
     return serde.deserialize(
       SerialFormat.fromJSON(serial),
       serdeOptions ?? options
@@ -147,7 +146,7 @@ describe("Test SerDe", () => {
     }
   });
 
-  it.only("DEFAULT HANDLER - Entity Hierarchy", () => {
+  it("DEFAULT HANDLER - Entity Hierarchy", async () => {
     const entity1 = new Entity();
     const entity2 = new Entity();
     const entity3 = new Entity();
@@ -162,10 +161,6 @@ describe("Test SerDe", () => {
     entity1.addComponent(new Parent([entity2]));
     entity1.addComponent(new ParentTwo([entity3, entity4]));
 
-    const options = {
-      useDefaultHandler: true,
-      useRegisteredHandlers: false,
-    };
     const serializeObjectReplacer = function (
       key: string,
       value: Object
@@ -179,15 +174,27 @@ describe("Test SerDe", () => {
         return JSON.stringify(component, serializeObjectReplacer);
       },
       deserializer: (data: unknown) => {
-        console.log("deserialize");
-        return { containsRefs: true, data: {} };
+        const dataObject = JSON.parse(data as string);
+        return { containsRefs: true, data: new Parent(dataObject.children) };
+      },
+    };
+    const parentTwoSerde = {
+      serializer: (component: unknown) => {
+        return JSON.stringify(component, serializeObjectReplacer);
+      },
+      deserializer: (data: unknown) => {
+        const dataObject = JSON.parse(data as string);
+        return {
+          containsRefs: true,
+          data: new ParentTwo(dataObject.children),
+        };
       },
     };
 
     const world = buildWorld()
-      .name("AWorld")
+      .name("World1")
       .withComponent(Parent, { serDe: parentSerde })
-      .withComponent(ParentTwo, { serDe: parentSerde })
+      .withComponent(ParentTwo, { serDe: parentTwoSerde })
       .build();
 
     world.addEntity(entity1);
@@ -195,8 +202,36 @@ describe("Test SerDe", () => {
     world.addEntity(entity3);
     world.addEntity(entity4);
 
-    const out = world.save();
-    console.log("WORLD", out.toJSON(2));
+    const outJSON = world.save().toJSON();
+
+    const world2 = buildWorld()
+      .name("World2")
+      .withComponent(Parent, { serDe: parentSerde })
+      .withComponent(ParentTwo, { serDe: parentTwoSerde })
+      .build();
+
+    world2.commands.load(SerialFormat.fromJSON(outJSON), {
+      useDefaultHandler: true,
+    });
+
+    // Critical when deserializing from prefabs
+    await world2.flushCommands();
+
+    expect(world2.save().toJSON()).eq(world.save().toJSON());
+    const firstEntity = world.getEntities().next().value;
+    expect(firstEntity).exist;
+
+    const aParent = firstEntity.getComponent(Parent);
+    expect(aParent).exist;
+    expect(aParent.children.length).eq(1);
+
+    const aParentTwo = firstEntity.getComponent(ParentTwo);
+    expect(aParentTwo).exist;
+    expect(aParentTwo.children.length).eq(2);
+
+    expect(aParent.children[0].id).eq(entity2.id);
+    expect(aParentTwo.children[0].id).eq(entity3.id);
+    expect(aParentTwo.children[1].id).eq(entity4.id);
   });
 
   it("DEFAULT HANDLERS: serialize -> deserialize Tag", () => {
