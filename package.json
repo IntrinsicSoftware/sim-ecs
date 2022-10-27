@@ -1,8 +1,8 @@
 {
-  "name": "@IntrinsicSoftware/sim-ecs",
+  "name": "sim-ecs",
   "version": "0.6.0",
   "license": "MPL 2.0",
-  "repository": "https://github.com/NSSTC/sim-ecs.git",
+  "repository": "https://github.com/IntrinsicSoftware/sim-ecs.git",
   "homepage": "https://nsstc.github.io/sim-ecs/",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
