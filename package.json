@@ -1,6 +1,6 @@
 {
   "name": "@IntrinsicSoftware/sim-ecs",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "license": "MPL 2.0",
   "repository": "https://github.com/IntrinsicSoftware/sim-ecs.git",
   "homepage": "https://nsstc.github.io/sim-ecs/",
