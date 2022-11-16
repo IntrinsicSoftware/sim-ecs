@@ -147,6 +147,7 @@ describe("Test SerDe", () => {
   });
 
   it("DEFAULT HANDLER - Entity Hierarchy", async () => {
+    const entity0 = new Entity();
     const entity1 = new Entity();
     const entity2 = new Entity();
     const entity3 = new Entity();
@@ -158,8 +159,9 @@ describe("Test SerDe", () => {
       constructor(public children: Entity[] = []) {}
     }
 
-    entity1.addComponent(new Parent([entity2]));
-    entity1.addComponent(new ParentTwo([entity3, entity4]));
+    entity3.addComponent(new Parent([entity4]));
+    entity0.addComponent(new Parent([entity1]));
+    entity0.addComponent(new ParentTwo([entity2, entity3]));
 
     const serializeObjectReplacer = function (
       key: string,
@@ -175,7 +177,14 @@ describe("Test SerDe", () => {
       },
       deserializer: (data: unknown) => {
         const dataObject = JSON.parse(data as string);
-        return { containsRefs: true, data: new Parent(dataObject.children) };
+        return {
+          containsRefs: true,
+          data: new Parent(
+            dataObject.children.map((child: string) =>
+              Reference.fromString(child)
+            )
+          ),
+        };
       },
     };
     const parentTwoSerde = {
@@ -186,7 +195,11 @@ describe("Test SerDe", () => {
         const dataObject = JSON.parse(data as string);
         return {
           containsRefs: true,
-          data: new ParentTwo(dataObject.children),
+          data: new ParentTwo(
+            dataObject.children.map((child: string) =>
+              Reference.fromString(child)
+            )
+          ),
         };
       },
     };
@@ -197,6 +210,7 @@ describe("Test SerDe", () => {
       .withComponent(ParentTwo, { serDe: parentTwoSerde })
       .build();
 
+    world.addEntity(entity0);
     world.addEntity(entity1);
     world.addEntity(entity2);
     world.addEntity(entity3);
@@ -218,7 +232,7 @@ describe("Test SerDe", () => {
     await world2.flushCommands();
 
     expect(world2.save().toJSON()).eq(world.save().toJSON());
-    const firstEntity = world.getEntities().next().value;
+    const firstEntity = world2.getEntities().next().value;
     expect(firstEntity).exist;
 
     const aParent = firstEntity.getComponent(Parent);
@@ -229,9 +243,14 @@ describe("Test SerDe", () => {
     expect(aParentTwo).exist;
     expect(aParentTwo.children.length).eq(2);
 
-    expect(aParent.children[0].id).eq(entity2.id);
-    expect(aParentTwo.children[0].id).eq(entity3.id);
-    expect(aParentTwo.children[1].id).eq(entity4.id);
+    expect(aParent.children[0].id).eq(entity1.id);
+    expect(aParentTwo.children[0].id).eq(entity2.id);
+    expect(aParentTwo.children[1].id).eq(entity3.id);
+
+    const nestedParent = aParentTwo.children[1].getComponent(Parent);
+    expect(nestedParent).to.exist;
+    expect(nestedParent.children.length).eq(1);
+    expect(nestedParent.children[0].id).eq(entity4.id);
   });
 
   it("DEFAULT HANDLERS: serialize -> deserialize Tag", () => {
